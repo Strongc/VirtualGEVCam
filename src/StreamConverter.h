@@ -49,13 +49,18 @@ class StreamConverter
     void Unlock();
 
   private:
+    int FindDirectory();
+    int FindArchive();
     int UpdateImageData();
 
   private:
-    HANDLE          _hFind;
-    WIN32_FIND_DATA _FindFileData;
-    std::string     _strDirName;
-    std::string     _strCurFileName;
+    HANDLE          _hFindDir;
+    HANDLE          _hFindArch;
+    WIN32_FIND_DATA _FindFileDataDir;
+    WIN32_FIND_DATA _FindFileDataArch;
+    std::string     _strRootDir;
+    std::string     _strCurDirName;
+    std::string     _strCurArchName;
 
     PixelFormats    _OutFmt;
     float           _yuvMatrix[9];

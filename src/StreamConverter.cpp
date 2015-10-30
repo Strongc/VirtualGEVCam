@@ -8,16 +8,17 @@
 
 using namespace std;
 
-StreamConverter::StreamConverter(const std::string strDirName)
-        : _hFind(INVALID_HANDLE_VALUE), _strDirName(strDirName), _strCurFileName("")
+StreamConverter::StreamConverter(const std::string strRootDir)
+        : _hFindDir(INVALID_HANDLE_VALUE), _hFindArch(INVALID_HANDLE_VALUE),
+          _strRootDir(strRootDir), _strCurDirName(""), _strCurArchName("")
 {
     _yuvMatrix[0] = 0.299;     _yuvMatrix[1] = 0.587;     _yuvMatrix[2] = 0.114;
     _yuvMatrix[3] = -0.168736; _yuvMatrix[4] = -0.331264; _yuvMatrix[5] = 0.5;
     _yuvMatrix[6] = 0.5;       _yuvMatrix[7] = -0.418688; _yuvMatrix[8] = -0.081312;
 
-    if (_strDirName[_strDirName.length()-1] == '\\')
+    if (_strRootDir[_strRootDir.length()-1] == '\\')
     {
-        _strDirName.erase(_strDirName.length()-1, 1);
+        _strRootDir.erase(_strRootDir.length()-1, 1);
     }
 
     _nFrameId          = 1;  // TODO
@@ -32,47 +33,59 @@ StreamConverter::StreamConverter(const std::string strDirName)
 
 StreamConverter::~StreamConverter()
 {
-    ::FindClose(_hFind);
 }
 
 int StreamConverter::Init()
 {
     int nRet = MV_OK;
 
-    _hFind = ::FindFirstFile((_strDirName + "\\*.*").c_str(), &_FindFileData);
 
-    if (INVALID_HANDLE_VALUE == _hFind)
-    {
-        cout << "StreamConverter::Init() FindFirstFile (" << _strDirName << ") fail." << endl;
-        return -1;
-    }
-
-    do
-    {
-        if ((_FindFileData.dwFileAttributes & FILE_ATTRIBUTE_ARCHIVE)
-            && !(_FindFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
-        {
-            // NOT directory
-            _strCurFileName = _strDirName + "\\" + string(_FindFileData.cFileName);
-            break;
-        }
-
-        if (!FindNextFile(_hFind, &_FindFileData))
-        {
-            _strCurFileName = "";
-            return -1;
-        }
-    }
-    while (true);
-
-
-    // allocate a memory buffer
+    // Allocate a memory buffer
     _pStreamBuffer = new unsigned char[IMAGE_FILE_MAX_SIZE];
     if (_pStreamBuffer == NULL)
     {
         return -1;
     }
     _pImageData = _pStreamBuffer;
+
+
+    // Find first frame file
+    _hFindDir = ::FindFirstFile((_strRootDir+"\\*").c_str(), &_FindFileDataDir);
+    if (INVALID_HANDLE_VALUE == _hFindDir)
+    {
+        cout << "[StreamConverter]::Init() FindFirstFile (" << _strRootDir << ") NOT exist." << endl;
+        return -1;
+    }
+
+    do
+    {
+        if (FindDirectory() == MV_OK)
+        {
+            _hFindArch = ::FindFirstFile((_strRootDir+"\\"+_strCurDirName+"\\*.*").c_str(), &_FindFileDataArch);
+            if (INVALID_HANDLE_VALUE == _hFindArch)
+            {
+                continue;
+            }
+
+            if (FindArchive() == MV_OK)
+            {
+                // Find frame file
+                break;
+            }
+            else
+            {
+                cout << "[StreamConverter]::Init() NO archive under " << _strRootDir+"\\"+_strCurDirName << endl;
+                continue;
+            }
+        }
+        else
+        {
+            cout << "[StreamConverter]::Init() find frame file fail!! (NO frame file under "
+                 << _strRootDir << ")" << endl;
+            return -1;
+        }
+    }
+    while (true);
 
     return nRet;
 }
@@ -87,6 +100,9 @@ int StreamConverter::DeInit()
         _pStreamBuffer = NULL;
     }
 
+    ::FindClose(_hFindDir);
+    ::FindClose(_hFindArch);
+
     return nRet;
 }
 
@@ -94,30 +110,114 @@ int StreamConverter::GetNextFrame(string& strFileName, PixelFormats OutFmt)
 {
     int nRet = -1;
 
-    do
+    if (FindArchive() != MV_OK)
     {
-        if (!FindNextFile(_hFind, &_FindFileData))
+        do
         {
-            // Traversal all files
-            _hFind = ::FindFirstFile((_strDirName + "\\*.*").c_str(), &_FindFileData);
-        }
+            if (FindDirectory() == MV_OK)
+            {
+                _hFindArch = ::FindFirstFile((_strRootDir+"\\"+_strCurDirName+"\\*.*").c_str(), &_FindFileDataDir);
+                if (INVALID_HANDLE_VALUE == _hFindArch)
+                {
+                    continue;
+                }
 
-        if ((_FindFileData.dwFileAttributes & FILE_ATTRIBUTE_ARCHIVE)
-            && !(_FindFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
-        {
-            // NOT directory
-            _strCurFileName = _strDirName + "\\" + string(_FindFileData.cFileName);
-            strFileName = _strCurFileName;
-            nRet = MV_OK;
-            break;
+                if (FindArchive() == MV_OK)
+                {
+                    // Find frame file
+                    strFileName = _strRootDir+"\\"+_strCurDirName+"\\"+_strCurArchName;
+                    break;
+                }
+                else
+                {
+                    continue;
+                }
+            }
+            else
+            {
+                // Loop goto the first directory
+                _hFindDir = ::FindFirstFile((_strRootDir+"\\*").c_str(), &_FindFileDataDir);
+                continue;
+            }
         }
+        while (true);
     }
-    while (true);
+
 
     _OutFmt = OutFmt;
     Lock();
     nRet = UpdateImageData();
     Unlock();
+
+    return nRet;
+}
+
+/** @fn          FindDirectory
+ *  @brief       Find directory, get the first directory or next directory
+ *  @param[in]   none
+ *  @param[out]  none
+ *  @return      MV_OK -- Find next directory
+ *               -1    -- No more directory
+ **/
+int StreamConverter::FindDirectory()
+{
+    int nRet = MV_OK;
+
+    do
+    {
+        if ((_FindFileDataDir.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+        {
+            // Directory
+            _strCurDirName = string(_FindFileDataDir.cFileName);
+            if (_strCurDirName != string(".") && _strCurDirName != string(".."))
+            {
+                break;
+            }
+        }
+
+        if (!FindNextFile(_hFindDir, &_FindFileDataDir))
+        {
+            // Traversal end
+            _strCurDirName = "";
+            nRet = -1;
+            break;
+        }
+    }
+    while (true);
+
+    return nRet;
+}
+
+/** @fn          FindArchive
+ *  @brief       Find archive, get the first archive or next archive
+ *  @param[in]   none
+ *  @param[out]  none
+ *  @return      MV_OK -- Find next archive
+ *               -1    -- No more archive
+ **/
+int StreamConverter::FindArchive()
+{
+    int nRet = MV_OK;
+
+    do
+    {
+        if ((_FindFileDataArch.dwFileAttributes & FILE_ATTRIBUTE_ARCHIVE)
+            && !(_FindFileDataArch.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+        {
+            // NOT directory
+            _strCurArchName = string(_FindFileDataArch.cFileName);
+            break;
+        }
+
+        if (!FindNextFile(_hFindArch, &_FindFileDataArch))
+        {
+            // Traversal end
+            _strCurArchName = "";
+            nRet = -1;
+            break;
+        }
+    }
+    while (true);
 
     return nRet;
 }
@@ -136,7 +236,7 @@ int StreamConverter::UpdateImageData()
 
     fstream file;
 
-    file.open(_strCurFileName.c_str(), ios::in | ios::binary);
+    file.open((_strRootDir+"\\"+_strCurDirName+"\\"+_strCurArchName).c_str(), ios::in | ios::binary);
 
     if (file.is_open())
     {
@@ -159,7 +259,7 @@ int StreamConverter::UpdateImageData()
 
         // TODO: OutFmt == MV_GVSP_PIX_MONO8
         // RAW File
-        if (_strCurFileName.substr(_strCurFileName.length() - 4, 4) == string(".raw"))
+        if (_strCurArchName.substr(_strCurArchName.length() - 4, 4) == string(".raw"))
         {
             // TODO:
             _nSizeX = 1920;
