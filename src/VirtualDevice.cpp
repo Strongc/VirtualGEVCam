@@ -96,7 +96,7 @@ int VirtualDevice::Init()
     if ((nRet = _Strm.Init()) != MV_OK)
     {
         cp_print(_cp, CP_FG_RED, "[WARN]");
-        cout << "Init stream converter fail!!" << endl;
+        cout << "[StreamConverter::Init] Init stream converter fail!!" << endl;
         return nRet;
     }
 
@@ -105,7 +105,7 @@ int VirtualDevice::Init()
     if ((nRet = _Gvcp.Init()) != MV_OK)
     {
         cp_print(_cp, CP_FG_RED, "[WARN]");
-        cout << "Init GVCP socket fail!!" << endl;
+        cout << "[DeviceGvcp::Init] Init GVCP socket fail!!" << endl;
         return nRet;
     }
 
@@ -114,7 +114,7 @@ int VirtualDevice::Init()
     if ((nRet = _Gvsp.Init()) != MV_OK)
     {
         cp_print(_cp, CP_FG_RED, "[WARN]");
-        cout << "Init GVSP socket fail!!" << endl;
+        cout << "[DeviceGvsp::Init] Init GVSP socket fail!!" << endl;
         return nRet;
     }
 
@@ -125,7 +125,7 @@ int VirtualDevice::Init()
     if ((nRet = InitVtMem()) != MV_OK)
     {
         cp_print(_cp, CP_FG_RED, "[WARN]");
-        cout << "Init virtual device memory fail!!" << endl;
+        cout << "[VirtualDevice::InitVtMem] Init virtual device memory fail!!" << endl;
         return nRet;
     }
 
