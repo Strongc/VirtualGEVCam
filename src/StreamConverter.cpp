@@ -106,11 +106,11 @@ int StreamConverter::DeInit()
     return nRet;
 }
 
-int StreamConverter::GetNextFrame(string& strFileName, PixelFormats OutFmt)
+int StreamConverter::GetNextFrame()
 {
     int nRet = -1;
 
-    if (FindArchive() != MV_OK)
+    if ((nRet = FindArchive()) != MV_OK)
     {
         do
         {
@@ -125,7 +125,7 @@ int StreamConverter::GetNextFrame(string& strFileName, PixelFormats OutFmt)
                 if (FindArchive() == MV_OK)
                 {
                     // Find frame file
-                    strFileName = _strRootDir+"\\"+_strCurDirName+"\\"+_strCurArchName;
+					nRet = MV_OK;
                     break;
                 }
                 else
@@ -143,12 +143,6 @@ int StreamConverter::GetNextFrame(string& strFileName, PixelFormats OutFmt)
         while (true);
     }
 
-
-    _OutFmt = OutFmt;
-    Lock();
-    nRet = UpdateImageData();
-    Unlock();
-
     return nRet;
 }
 
@@ -165,7 +159,15 @@ int StreamConverter::FindDirectory()
 
     do
     {
-        if ((_FindFileDataDir.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+		if (!FindNextFile(_hFindDir, &_FindFileDataDir))
+		{
+			// Traversal end
+			_strCurDirName = "";
+			nRet = -1;
+			break;
+		}
+
+		if ((_FindFileDataDir.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
         {
             // Directory
             _strCurDirName = string(_FindFileDataDir.cFileName);
@@ -173,14 +175,6 @@ int StreamConverter::FindDirectory()
             {
                 break;
             }
-        }
-
-        if (!FindNextFile(_hFindDir, &_FindFileDataDir))
-        {
-            // Traversal end
-            _strCurDirName = "";
-            nRet = -1;
-            break;
         }
     }
     while (true);
@@ -201,19 +195,19 @@ int StreamConverter::FindArchive()
 
     do
     {
-        if ((_FindFileDataArch.dwFileAttributes & FILE_ATTRIBUTE_ARCHIVE)
-            && !(_FindFileDataArch.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
-        {
-            // NOT directory
-            _strCurArchName = string(_FindFileDataArch.cFileName);
-            break;
-        }
-
         if (!FindNextFile(_hFindArch, &_FindFileDataArch))
         {
             // Traversal end
             _strCurArchName = "";
             nRet = -1;
+            break;
+        }
+
+        if ((_FindFileDataArch.dwFileAttributes & FILE_ATTRIBUTE_ARCHIVE)
+            && !(_FindFileDataArch.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+        {
+            // NOT directory
+            _strCurArchName = string(_FindFileDataArch.cFileName);
             break;
         }
     }
@@ -222,12 +216,22 @@ int StreamConverter::FindArchive()
     return nRet;
 }
 
-void StreamConverter::GetImageData(Device::virtual_addr_t& pData, size_t& nLen, uint32_t& nSizeX, uint32_t& nSizeY)
+void StreamConverter::GetImageData(Device::virtual_addr_t& pData, size_t& nLen, uint32_t& nSizeX, uint32_t& nSizeY, PixelFormats OutFmt)
 {
+    _OutFmt = OutFmt;
+    Lock();
+    UpdateImageData();
+    Unlock();
+
     pData  = _pImageData;
     nLen   = _nImageLen;
     nSizeX = _nSizeX;
     nSizeY = _nSizeY;
+}
+
+std::string StreamConverter::GetCurrentFileName()
+{
+    return string(_strRootDir+"\\"+_strCurDirName+"\\"+_strCurArchName);
 }
 
 int StreamConverter::UpdateImageData()

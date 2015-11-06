@@ -43,8 +43,11 @@ class StreamConverter
     int Init();
     int DeInit();
 
-    int GetNextFrame(std::string& strFileName, PixelFormats OutFmt = MV_GVSP_PIX_MONO8);
-    void GetImageData(Device::virtual_addr_t& pData, size_t& nLen, uint32_t& nSizeX, uint32_t& nSizeY);
+    int GetNextFrame();
+    void GetImageData(Device::virtual_addr_t& pData, size_t& nLen, uint32_t& nSizeX, uint32_t& nSizeY,
+                      PixelFormats OutFmt = MV_GVSP_PIX_MONO8);
+    std::string GetCurrentFileName();
+
     void Lock();
     void Unlock();
 
@@ -66,7 +69,7 @@ class StreamConverter
     float           _yuvMatrix[9];
 
     uint32_t    _nFrameId;
-    double      _fTriggerFrequency;
+    double      _fTriggerFrequency;  // TODO
 
     CMVMutex       _BufMutex;
     unsigned char* _pStreamBuffer;

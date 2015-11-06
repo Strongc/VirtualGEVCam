@@ -22,7 +22,6 @@
 #include "VirtualDevice.h"
 
 using namespace std;
-using namespace MVComponent;
 using namespace MvCamCtrl;
 
 /* @fn          GetLocalIp
@@ -70,10 +69,8 @@ void GetLocalMac(void* pInfo, unsigned int& nMacAddrHigh, unsigned int& nMacAddr
 #endif
 }
 
-VirtualDevice::VirtualDevice(const char* szInDataDir, const char* szXmlFileName, const char* szDeviceIni)
+VirtualDevice::VirtualDevice(const char* szXmlFileName, const char* szDeviceIni)
         : _bCancel(false), _strXmlFileName(szXmlFileName),
-          _Strm(szInDataDir), _Gvcp((Device*)this), _Gvsp((Device*)this, (StreamConverter*)&_Strm),
-          _pThreadGvcp(MV_NULL), _pThreadGvsp(MV_NULL),
           _iniDeviceInfo(szDeviceIni), _pVtMem(NULL), _VtMemSize(MV_GEV_REG_MEMORY_SIZE+MV_GEV_XML_FILE_MAX_SIZE)
 {
     _cp = cp_init();
@@ -92,33 +89,6 @@ int VirtualDevice::Init()
     _pVtMem = new unsigned char[_VtMemSize];
 
 
-    // Init stream converter
-    if ((nRet = _Strm.Init()) != MV_OK)
-    {
-        cp_print(_cp, CP_FG_RED, "[WARN]");
-        cout << "[StreamConverter::Init] Init stream converter fail!!" << endl;
-        return nRet;
-    }
-
-
-    // Init GVCP socket
-    if ((nRet = _Gvcp.Init()) != MV_OK)
-    {
-        cp_print(_cp, CP_FG_RED, "[WARN]");
-        cout << "[DeviceGvcp::Init] Init GVCP socket fail!!" << endl;
-        return nRet;
-    }
-
-
-    // Init GVSP socket
-    if ((nRet = _Gvsp.Init()) != MV_OK)
-    {
-        cp_print(_cp, CP_FG_RED, "[WARN]");
-        cout << "[DeviceGvsp::Init] Init GVSP socket fail!!" << endl;
-        return nRet;
-    }
-
-
     // Init virtual device memory
     // CCP
     memset(_pVtMem, 0, _VtMemSize);
@@ -128,7 +98,6 @@ int VirtualDevice::Init()
         cout << "[VirtualDevice::InitVtMem] Init virtual device memory fail!!" << endl;
         return nRet;
     }
-
 
     return nRet;
 }
@@ -244,39 +213,7 @@ int VirtualDevice::DeInit()
         _pVtMem = NULL;
     }
 
-    _Strm.DeInit();
-    _Gvcp.DeInit();
-    _Gvsp.DeInit();
-
     return nRet;
-}
-
-int VirtualDevice::Starting()
-{
-    _pThreadGvcp = MV_CreateThread(MV_NULL, DeviceGVCP::HandlingControlPacket, (&(this->_Gvcp)));
-    if (_pThreadGvcp == MV_NULL)
-    {
-        return -1;
-    }
-
-    _pThreadGvsp = MV_CreateThread(MV_NULL, DeviceGVSP::HandlingStreamPacket, (&(this->_Gvsp)));
-    if (_pThreadGvsp == MV_NULL)
-    {
-        return -1;
-    }
-
-    // Wait for cancel
-    // _bCancel
-    while (!IsCancel())
-    {
-        UpdateStreamNextFrame();
-        Sleep(100);
-    }
-
-    MV_WaitForThreadEnd(_pThreadGvcp);
-    MV_WaitForThreadEnd(_pThreadGvsp);
-
-    return MV_OK;
 }
 
 const MV_CC_DEVICE_INFO* VirtualDevice::GetDeviceInfo()
@@ -332,26 +269,6 @@ int VirtualDevice::SetMem(virtual_addr_t MemAddr, const void* Data, const size_t
     {
         nRet = MV_E_PARAMETER;
     }
-
-    return nRet;
-}
-
-int VirtualDevice::UpdateStreamNextFrame(StreamConverter::PixelFormats OutFmt)
-{
-    int nRet = MV_OK;
-    string strFileName;
-
-    if ((nRet = _Strm.GetNextFrame(strFileName, OutFmt)) != MV_OK)
-    {
-        return nRet;
-    }
-
-    Device::virtual_addr_t pData;
-    size_t                 nLen;
-    uint32_t               nSizeX, nSizeY;
-    _Strm.GetImageData(pData, nLen, nSizeX, nSizeY);
-    SetReg((virtual_addr_t)REG_XML_Width_RegAddr, nSizeX);
-    SetReg((virtual_addr_t)REG_XML_Height_RegAddr, nSizeY);
 
     return nRet;
 }

@@ -24,12 +24,10 @@
 #include "Inc/color_print/color_print.h"
 #include "Inc/MVErrorDefine.h"
 #include "Inc/MVGigEVisionDeviceDefine.h"
+#include "Inc/MVGiGEVisionGVCPRegisterDefine.h"
 #include "Inc/MV_CrossPlatform/MV_CrossPlatform.h"
 
 #include "Device.h"
-#include "DeviceGVCP.h"
-#include "DeviceGVSP.h"
-#include "StreamConverter.h"
 
 #define MV_GEV_BOOTSTRAP_REG_SIZE 0xA000
 #define MV_GEV_REG_MEMORY_SIZE    (1 << 20)  // 1MB
@@ -49,7 +47,7 @@
 class VirtualDevice : public Device
 {
   public:
-    VirtualDevice(const char* szInDataDir, const char* szXmlFileName, const char* szDeviceIni);
+    VirtualDevice(const char* szXmlFileName, const char* szDeviceIni);
     virtual ~VirtualDevice();
 
     // No copying allowed
@@ -57,7 +55,6 @@ class VirtualDevice : public Device
     void operator=(const VirtualDevice&);
 
     int Init();
-    int Starting();
     int DeInit();
 
     const MvCamCtrl::MV_CC_DEVICE_INFO* GetDeviceInfo();
@@ -67,8 +64,6 @@ class VirtualDevice : public Device
     int SetReg(virtual_addr_t RegAddr, const uint32_t Data);
     int GetMem(virtual_addr_t MemAddr, void* Data, const size_t Count);
     int SetMem(virtual_addr_t MemAddr, const void* Data, const size_t Count);
-
-    int UpdateStreamNextFrame(StreamConverter::PixelFormats OutFmt = MV_GVSP_PIX_MONO8);
 
     uint32_t GetAcquisitionState();
     void SetTriggerFrequency(double frequency);
@@ -88,21 +83,17 @@ class VirtualDevice : public Device
     std::string                  _strXmlFileName;
     uint32_t                     _nXmlFileSize;
 
-    StreamConverter              _Strm;
-    DeviceGVCP                   _Gvcp;
-    DeviceGVSP                   _Gvsp;
-    void*                        _pThreadGvcp;
-    void*                        _pThreadGvsp;
-
-    double                       _fTriggerFrequency;
+    double                       _fTriggerFrequency;  // TODO
 
     // Virtual things
-    cp_state_ptr   _cp;
     std::string    _strDeviceBinFilename;
     INI::Parser    _iniDeviceInfo;
 
     virtual_addr_t _pVtMem;
     uint32_t       _VtMemSize;
+
+    // Color print
+    cp_state_ptr   _cp;
 };
 
 

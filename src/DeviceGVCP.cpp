@@ -101,7 +101,6 @@ ThreadReturnType MV_STDCALL DeviceGVCP::HandlingControlPacket(void* Arg)
         if (nLen > 0)
         {
             ss << "[HandlingControlPacket] <-- " << pDeviceGvcp->_From << "  ";
-            cout << ss.rdbuf();
 
             CMD_MSG_HEADER* pCmdHdr = (CMD_MSG_HEADER*) (pDeviceGvcp->_cRecvData);
             if (pCmdHdr->cKeyValue == MV_GVCP_CMD_KEY_VALUE)
@@ -130,7 +129,8 @@ ThreadReturnType MV_STDCALL DeviceGVCP::HandlingControlPacket(void* Arg)
                         }
                     case MV_GEV_WRITEREG_CMD:
                         {
-                            cout << "Write register command" << endl;
+                            ss << "Write register command" << endl;
+                            cout << ss.rdbuf();
                             pDeviceGvcp->WriteRegAck();
                             ss << "[HandlingControlPacket] --> " << pDeviceGvcp->_From
                                << "  Write register acknowledge" << endl;

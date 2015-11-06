@@ -108,7 +108,7 @@ ThreadReturnType MV_STDCALL DeviceGVSP::HandlingStreamPacket(void* Arg)
     DeviceGVSP* pDeviceGvsp = (DeviceGVSP*)Arg;
     Device::virtual_addr_t pStreamBuffer = NULL;
     size_t nStreamSize;
-	size_t nPerDataSize;
+    size_t nPerDataSize;
     uint32_t nSizeX, nSizeY;
     uint32_t nLen;
     stringstream ss;
@@ -137,14 +137,6 @@ ThreadReturnType MV_STDCALL DeviceGVSP::HandlingStreamPacket(void* Arg)
                 cout << ss.rdbuf();
                 return nRet;
             }
-            string strFileName;
-            if ((nRet = pDeviceGvsp->_pStrm->GetNextFrame(strFileName)) != MV_OK)
-            {
-                cp_print(pDeviceGvsp->_cp, CP_FG_RED, "[WARN]");
-                ss << "[HandlingStreamPacket] StreamConverter::GetNextFrame fail!!!" << endl;
-                cout << ss.rdbuf();
-                return nRet;
-            }
             pDeviceGvsp->_pStrm->GetImageData(pStreamBuffer, nStreamSize, nSizeX, nSizeY);
             if (pStreamBuffer == NULL)
             {
@@ -153,9 +145,17 @@ ThreadReturnType MV_STDCALL DeviceGVSP::HandlingStreamPacket(void* Arg)
                 cout << ss.rdbuf();
                 return nRet;
             }
-            ss << "[HandlingStreamPacket]  --> " << pDeviceGvsp->_Host << "  Trainsmitting data (blockid = "
-               << pDeviceGvsp->_nBlockId << ") ......" << endl;
+            ss << "[HandlingStreamPacket] Get frame image \"" << pDeviceGvsp->_pStrm->GetCurrentFileName() << "\"\n"
+               << "[HandlingStreamPacket]  --> " << pDeviceGvsp->_Host << "  Trainsmitting data (blockid = "
+               << pDeviceGvsp->_nBlockId << ") ......\n";
             cout << ss.rdbuf();
+            if ((nRet = pDeviceGvsp->_pStrm->GetNextFrame()) != MV_OK)
+            {
+                cp_print(pDeviceGvsp->_cp, CP_FG_RED, "[WARN]");
+                ss << "[HandlingStreamPacket] StreamConverter::GetNextFrame fail!!!" << endl;
+                cout << ss.rdbuf();
+                return nRet;
+            }
 
             // Data Leader
             pDeviceGvsp->_nPacketId = 0;
@@ -206,7 +206,7 @@ ThreadReturnType MV_STDCALL DeviceGVSP::HandlingStreamPacket(void* Arg)
 
                 // Waiting
                 // Sleep(pDeviceGvsp->_nPacketDelay);
-				// Sleep(2);
+                // Sleep(2);
             }
             pDeviceGvsp->_pStrm->Unlock();
             // Exit StreamConverter buffer
